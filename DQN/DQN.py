@@ -1,121 +1,194 @@
+import tensorflow as tf
 import numpy as np
 import AgentModel
-import tensorflow as tf
-import experience_replay
-
+import stack_frames
+import environment
+from collections import deque
+import random
 
 
 # noinspection PyShadowingNames
 class DQN:
     # Here we create our agent's DQN
-    def __init__(self, state_shape, h_parameters, pretrain_length, stack_size, possible_actions):
-        # Arguments:
-        #   state_shape: the shape of each input which we're going to feed our agent
-        #   num_actions: number of actions that our agent is capable of doing in the environment
-        #   gamma: our Q-Learning discount factor
-        #   batch_size: batch size
-        #   max_buffer_size: the maximum limit of experiences which we can store in our replay buffer
-        #   learning_rate: learning rate
-        #   pretrain_length: number of instances to put inside our replay buffer before beginning training the agent
-        #   stack_size: how many frames to stack together to create a single state for feeding the agent
-        # Implements:
-        #   Creates an instance of our agent
+    def __init__(self, state_shape, hyper_parameters, possible_actions):
+        self.dqn_agent = AgentModel.Agent(input_shape=state_shape, output_shape=len(possible_actions),
+                                          actions=possible_actions, hyper_parameters=hyper_parameters,
+                                          target_network=False)
+        self.dqn_target = AgentModel.Agent(input_shape=state_shape, output_shape=len(possible_actions),
+                                           actions=possible_actions, hyper_parameters=hyper_parameters,
+                                           target_network=True)
+        self.batch_size = 200  # hyper_parameters['batch_size']
+        self.hyper_parameters = hyper_parameters
         self.possible_actions = possible_actions
-        self.state_shape = state_shape
-        self.num_actions = len(possible_actions)
-        self.learning_rate = h_parameters['learning_rate']
-        self.optimizer = tf.optimizers.RMSprop(
-            learning_rate=self.learning_rate)  # We're gonna use RMSProp as out optimizer
-        self.gamma = h_parameters['gamma']
-        self.model = AgentModel.AgentModel(self.state_shape, self.num_actions)  # Instantiate an agent
-        self.memory = experience_replay.create_and_fill_memory(stack_size,
-                                                               pretrain_length)  # Fill agent's replay buffer before training
-        self.batch_size = h_parameters['batch_size']
-        self.max_buffer_size = h_parameters['max_buffer_size']
-        self.losses = []
-
-    def predict(self, inputs):
-        # Arguments:
-        #   inputs: a single or a batch of states to determine the next action from
-        # Returns:
-        #   agent network's output. Q values for each possible action
-        # Implements:
-        #   A single forward pass through agent's network with the given inputs
-        return self.model(inputs)
-
-    def get_batch(self):
-        # Arguments:
-        #   -
-        # Returns:
-        #   -
-        # Implements:
-        #   Training the agent on the experiences in its replay buffer
-
-        # Sampling random experiences from agent's replay buffer
-        states, actions, rewards, next_states, dones = self.memory.sample(self.batch_size)
-        # predict the next state's Q-values
-        next_values = self.predict(next_states)
-        # Get the indexes of the action with hte highest Q-value
-        indexes = tf.math.argmax(next_values, axis=1)
-        # Create an empty list. This is going to contain our target-Qs values
-        targetQs = []
-
-        # If we're in a terminal state, return the reward, if not, return rewards+gamma*(next action's Q-value)
-        for i, done in enumerate(dones):
-            if done:
-                targetQs.append(rewards[i])
-            else:
-                targetQs.append(rewards[i] + self.gamma * next_values[i][indexes[i]])
-        return states, actions, targetQs
+        self.epsilon = 0.9
+        self.max_epsilon = 0.9
+        self.min_epsilon = 0.01  # hyper_parameters['epsilon']
+        self.episode = 0
+        self.gamma=0.9 #hyperparameter
 
     def train(self):
-        states, actions, targetQs = self.get_batch()
-        # start keeping tab on agent network's variables for backpropagation
-        with tf.GradientTape() as tape:
-            selected_action_values = tf.math.reduce_sum(self.predict(states) * actions, axis=1)
-            loss = tf.math.reduce_sum(tf.math.square(tf.math.subtract(targetQs, selected_action_values)))
+        batch = self.dqn_agent.memory.sample(self.batch_size)
+        for exprerience in batch:
+            states, actions, next_states, rewards, terminals = np.asarray(exprerience.state).reshape(1, 84, 84, 4), \
+                                                               exprerience.action, np.asarray(exprerience.next_state)\
+                                                                .reshape(1, 84, 84, 4),\
+                                                               exprerience.reward,\
+                                                               exprerience.done
 
-        self.losses.append(loss)
-        variables = self.model.trainable_variables
-        gradients = tape.gradient(loss, variables)
-        self.optimizer.apply_gradients(zip(gradients, variables))
+            batch_next_state_q_values = self.dqn_target.model(next_states)
+            batch_target_actions_indexes = tf.math.argmax(batch_next_state_q_values, axis=1)
+            targets = []
 
-    def get_action(self, states, epsilon):
-        # Arguments:
-        #   states: states which we want to predict corresponding actions for
-        #   epsilon: exploration rate
-        # Returns:
-        #   action: the action to be taken
-        # Implements:
-        #   Passes the states through the agent's network and calculates the action that must be taken
+            if not terminals:
+                targets.append(rewards)
+            else:
+                targets.append(rewards + self.gamma * batch_next_state_q_values[batch_target_actions_indexes])
 
-        if np.random.random() < epsilon:
-            # Explore
-            return self.possible_actions[np.random.choice(self.num_actions)]
+            with tf.GradientTape() as tape:
+                batch_state_q_values = self.dqn_agent.model(states)
+                batch_action_qs = tf.math.reduce_sum(batch_state_q_values * actions, axis=1)
+                loss = tf.keras.losses.mse(targets, batch_action_qs)
+
+            # print(loss)
+            model_gradients = tape.gradient(loss, self.dqn_agent.model.trainable_variables)
+            self.dqn_agent.optimizer.apply_gradients(zip(model_gradients, self.dqn_agent.model.trainable_variables))
+
+    def get_action(self, state, model):
+        if random.random() < self.epsilon:
+            action = random.choice(self.possible_actions)
         else:
-            # Exploit
-            action = self.predict(states)
-            action_index = tf.math.argmax(action, axis=1).numpy()[0]
-            return self.possible_actions[action_index]
+            action_qs = model(np.asarray(state).reshape(1, 84, 84, 4))
+            action_index = tf.argmax(action_qs, axis=1).numpy()
+            action = self.possible_actions[action_index[0]]
 
-    def add_experience(self, experience):
-        # Arguments:
-        #   experience: an experience instance. it contain the current state, action taken, reward received, next state and whether we have reached the terminal state or not
-        # Returns:
-        # -
-        # Implements:
-        #   filling the agent's replay buffer with new experiences
+        if self.epsilon > self.min_epsilon:
+            self.epsilon -= 0.00001
 
-        # if the replay buffer is at it's limit delete the oldest instance and append the latest experience
-        if self.max_buffer_size > self.memory.buffer_size:
-            for key in self.memory.buffer.keys():
-                self.memory.buffer[key].pop(0)
-            self.memory.add(experience[0], experience[1], experience[2], experience[3],
-                            experience[4])
+        return action
+
+    def update_target_network(self):
+        self.dqn_target.model.set_weights(self.dqn_agent.model.get_weights())
+
+    def play(self, game, possible_actions, turns):
+        for i in range(turns):
+            game.new_episode()
+            frame_skip = 0
+            stacked_frames = deque([np.zeros((84, 84, 4), dtype=np.int) for _ in range(4)], maxlen=4)
+            state = stack_frames.stack_frames(stacked_frames, game.get_state().screen_buffer, True)
+            action = self.get_action(state, self.dqn_agent.model)
+            reward = game.make_action(action)
+            next_state = stack_frames.stack_frames(state, game.get_state().screen_buffer, False)
+            next_action = self.get_action(next_state, self.dqn_target.model)
+            agent_q = tf.math.reduce_sum(
+                self.dqn_agent.model(np.asarray(state).reshape(1, 84, 84, 4)) * action, axis=1).numpy()
+            target_q = tf.math.reduce_sum(
+                self.dqn_target.model(np.asarray(next_state).reshape(1, 84, 84, 4)) * next_action, axis=1).numpy()
+            td_error = ((target_q - agent_q) ** 2)[0]
+            self.dqn_agent.memory.add(state=state, action=action, reward=reward, next_state=next_state,
+                                      done=game.is_episode_finished(),
+                                      td_error=td_error)
+            while not game.is_episode_finished():
+                state = stack_frames.stack_frames(state, game.get_state().screen_buffer, False)
+                action = self.get_action(state, self.dqn_agent.model)
+                reward = game.make_action(action)
+                terminal = game.is_episode_finished()
+                if not terminal:
+                    next_state = stack_frames.stack_frames(state, game.get_state().screen_buffer, False)
+                    next_action = self.get_action(next_state, self.dqn_target.model)
+                    agent_q = tf.math.reduce_sum(
+                        self.dqn_agent.model(np.asarray(state).reshape(1, 84, 84, 4)) * action,
+                        axis=1).numpy()
+                    target_q = tf.math.reduce_sum(
+                        self.dqn_target.model(np.asarray(next_state).reshape(1, 84, 84, 4)) * next_action,
+                        axis=1).numpy()
+                    td_error = ((target_q - agent_q) ** 2)[0]
+                    self.dqn_agent.memory.add(state, action, reward, next_state,
+                                              game.is_episode_finished(),
+                                              td_error)
+                # else:
+                #     next_state = deque([np.zeros((84, 84), dtype=np.int) for _ in range(4)], maxlen=4)
+                #     self.dqn_agent.memory.add(state, action, reward, next_state,
+                #                               game.is_episode_finished(),
+                #                               0.01)
+
+    def true_play_get_action(self, state, model):
+
+        action_qs = model(np.asarray(state).reshape(1, 84, 84, 4))
+        action_index = tf.argmax(action_qs, axis=1).numpy()
+        action = self.possible_actions[action_index[0]]
+
+        return action
+
+    def true_play(self, game,turns):
+        for i in range(turns):
+            game.new_episode()
+            stacked_frames = deque([np.zeros((84, 84, 4), dtype=np.int) for _ in range(4)], maxlen=4)
+            state = stack_frames.stack_frames(stacked_frames, game.get_state().screen_buffer, True)
+            action = self.true_play_get_action(state, self.dqn_agent.model)
+            reward = game.make_action(action)
+            # next_state = stack_frames.stack_frames(stacked_frames, game.get_state().screen_buffer, False)
+            while not game.is_episode_finished():
+                state = stack_frames.stack_frames(state, game.get_state().screen_buffer, False)
+                action = self.true_play_get_action(state, self.dqn_agent.model)
+                reward = game.make_action(action)
+
+    def fill_memory(self, game, pre_train_length):
+        for i in range(pre_train_length):
+            game.new_episode()
+            frame_skip = 0
+            stacked_frames = deque([np.zeros((84, 84, 4), dtype=np.int) for _ in range(4)], maxlen=4)
+            state = stack_frames.stack_frames(stacked_frames, game.get_state().screen_buffer, True)
+            action = self.get_action(state, self.dqn_agent.model)
+            reward = game.make_action(action)
+            next_state = stack_frames.stack_frames(state, game.get_state().screen_buffer, False)
+            next_action = self.get_action(next_state, self.dqn_target.model)
+            agent_q = tf.math.reduce_sum(
+                self.dqn_agent.model(np.asarray(state).reshape(1, 84, 84, 4)) * action, axis=1).numpy()
+            target_q = tf.math.reduce_sum(
+                self.dqn_target.model(np.asarray(next_state).reshape(1, 84, 84, 4)) * next_action, axis=1).numpy()
+            td_error = ((target_q - agent_q) ** 2)[0]
+            self.dqn_agent.memory.add(state=state, action=action, reward=reward, next_state=next_state,
+                                      done=game.is_episode_finished(),
+                                      td_error=td_error)
+            while not game.is_episode_finished():
+                state = stack_frames.stack_frames(state, game.get_state().screen_buffer, False)
+                action = self.get_action(state, self.dqn_agent.model)
+                reward = game.make_action(action)
+                terminal = game.is_episode_finished()
+                if not terminal:
+                    next_state = stack_frames.stack_frames(state, game.get_state().screen_buffer, False)
+                    next_action = self.get_action(next_state, self.dqn_target.model)
+                    agent_q = tf.math.reduce_sum(
+                        self.dqn_agent.model(np.asarray(state).reshape(1, 84, 84, 4)) * action,
+                        axis=1).numpy()
+                    target_q = tf.math.reduce_sum(
+                        self.dqn_target.model(np.asarray(next_state).reshape(1, 84, 84, 4)) * next_action,
+                        axis=1).numpy()
+                    td_error = ((target_q - agent_q) ** 2)[0]
+                    self.dqn_agent.memory.add(state, action, reward, next_state,
+                                              game.is_episode_finished(),
+                                              td_error)
+                # else:
+                #     next_state = deque([np.zeros((84, 84), dtype=np.int) for _ in range(4)], maxlen=4)
+                #     self.dqn_agent.memory.add(state, action, reward, next_state,
+                #                               game.is_episode_finished(),
+                #                               0.01)
 
 
-
-
-# def step(game, agent, epsilon):
-#     play_game(game, agent, epsilon)
-#     agent.train()
+game, possible_actions = environment.create_environment()
+dqn = DQN([84, 84, 4], {'batch_size': 10, 'pretrain_length': 3}, possible_actions=possible_actions)
+dqn.fill_memory(game, 2)
+i = 0
+while True:
+    i += 1
+    print(i)
+    dqn.play(game, possible_actions, 10)
+    dqn.train()
+    print(dqn.epsilon)
+    if i % 5 == 0:
+        print('testing network')
+        dqn.true_play(game,10)
+    if i % 25 == 0:
+        print('copying weights')
+        dqn.update_target_network()
+        dqn.epsilon+=0.5

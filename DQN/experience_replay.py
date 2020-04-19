@@ -16,16 +16,16 @@ class Memory:
                        'action': [],
                        'reward': [],
                        'next_state': [],
-                       'done': []}
+                       'terminal': []}
         self.buffer_size = 0
 
-    def add(self, state, action, reward, next_state, done):
+    def add(self, state, action, reward, next_state, terminal):
         # To add new experiences to buffer
         self.buffer['state'].append(copy.deepcopy(state))
         self.buffer['action'].append(action)
         self.buffer['reward'].append(reward)
         self.buffer['next_state'].append(next_state)
-        self.buffer['done'].append(done)
+        self.buffer['terminal'].append(terminal)
 
     def sample(self, batch_size):
         # To return a random batch from the buffer
@@ -34,9 +34,16 @@ class Memory:
         actions = np.asarray([self.buffer['action'][i] for i in rand_indexes])
         rewards = np.asarray([self.buffer['reward'][i] for i in rand_indexes], dtype=np.float32)
         next_states = np.asarray([self.buffer['next_state'][i] for i in rand_indexes])
-        dones = np.asarray([self.buffer['done'][i] for i in rand_indexes])
-        batch = (states, actions, rewards, next_states, dones)
+        terminals = np.asarray([self.buffer['terminal'][i] for i in rand_indexes])
+        batch = (states, actions, rewards, next_states, terminals)
         self.buffer_size += 1
+        if self.buffer_size>1000:
+            self.buffer['state'].pop()
+            self.buffer['action'].pop()
+            self.buffer['reward'].pop()
+            self.buffer['next_state'].pop()
+            self.buffer['terminal'].pop()
+            self.buffer_size-=1
         return batch
 
 
@@ -67,9 +74,9 @@ def create_and_fill_memory(stack_size=4, pretrain_length=64):
             stacked_frames = stack_frames.stack_frames(stacked_frames, state.screen_buffer, False)
             action = random.choice(possible_actions)
             reward = game.make_action(action)
-            done = game.is_episode_finished()
+            terminal = game.is_episode_finished()
             next_stacked_frames = stack_frames.stack_frames(stacked_frames, state.screen_buffer, False)
-            memory.add(np.asarray(stacked_frames).T, action, reward, np.asarray(next_stacked_frames).T, done)
+            memory.add(np.asarray(stacked_frames).T, action, reward, np.asarray(next_stacked_frames).T, terminal)
     game.close()
 
     return memory
