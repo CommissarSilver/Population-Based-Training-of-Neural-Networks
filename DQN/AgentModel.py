@@ -9,7 +9,7 @@ def model_architecture(inputs_shape, output_shape):
                                          kernel_size=[8, 8],
                                          strides=[4, 4],
                                          padding='VALID',
-                                         kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2),
+                                         kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.),
                                          use_bias=False,
                                          name='Conv_Layer_1')(input_layer)
     # conv_layer1_batchnorm: batchnormalization on conv_layer1's outputs
@@ -21,7 +21,7 @@ def model_architecture(inputs_shape, output_shape):
                                          kernel_size=[4, 4],
                                          strides=[2, 2],
                                          padding='VALID',
-                                         kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2),
+                                         kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.),
                                          use_bias=False,
                                          name='Conv_Layer_2')(conv_layer1_batchnorm)
     # conv_layer2_batchnorm: batchnormalization on conv_layer2's outputs
@@ -33,7 +33,7 @@ def model_architecture(inputs_shape, output_shape):
                                          kernel_size=[4, 4],
                                          strides=[2, 2],
                                          padding='VALID',
-                                         kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2),
+                                         kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.),
                                          use_bias=False,
                                          name='Conv_Layer_3')(conv_layer2_batchnorm)
     # conv_layer3_batchnorm: batchnormalization on conv_layer3's outputs
@@ -63,7 +63,7 @@ class Agent:
     # Here we implement the agent's neural model
     def __init__(self, input_shape, output_shape, actions, hyper_parameters, target_network=False):
         self.model = model_architecture(inputs_shape=input_shape, output_shape=output_shape)
-        self.optimizer = tf.keras.optimizers.Adam(0.00001)
+        self.optimizer = tf.keras.optimizers.Adam(0.00001)  # hyperparameter
         self.actions = actions
         if not target_network:
             self.memory = Memory.Memory(a=0.1, maximum_length=10000)
