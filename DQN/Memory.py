@@ -71,7 +71,7 @@ def retrieve(tree: Node, probs):
             if prob < node.left.value and not node.is_leaf:
                 node = node.left
             elif prob > node.left.value and not node.is_leaf:
-                prob = prob - node.right.value
+                prob = abs(prob - node.right.value)
                 node = node.right
             elif node.is_leaf:
                 node = node
@@ -94,12 +94,12 @@ class Experience:
 
 class Memory:
     # here we create our agent's memory
-    def __init__(self, a, maximum_length=10000):
+    def __init__(self, a, maximum_length=100000):
         self.buffer = {}  # replay buffer
         self.counter = 0  # keeps count of how many experiences we've had
         self.sum_probs = 0  # sum of all experiences' probabilities
         self.a = a  # a hyperparameter which is used to introduce some randomness in the experience selection
-        self.maxlen = maximum_length  # maximum capacity of agent's replay buffer
+        self.max_len = maximum_length  # maximum capacity of agent's replay buffer
 
     def add(self, state, action, reward, next_state, done, td_error):
         # Arguments:
@@ -110,14 +110,14 @@ class Memory:
         #   adds an experience to the replay buffer. if the replay buffer is at maximum capacity,
         #   deletes a random memory and adds the new experience in its stead.
         self.counter += 1
-        if len(self.buffer.keys()) + 1 < self.maxlen:
+        if len(self.buffer.keys()) + 1 < self.max_len:
             self.buffer[self.counter] = Experience(state=state, action=action, reward=reward,
                                                    next_state=next_state, done=done, id=self.counter,
                                                    td_error=td_error)
             self.sum_probs += td_error ** self.a
         else:
             rand_idx = random.choice(list(self.buffer.keys()))
-            self.sum_probs -= self.buffer[rand_idx].td_error ** self.a
+            self.sum_probs -= (self.buffer[rand_idx].td_error ** self.a)
             del self.buffer[rand_idx]
             self.buffer[self.counter] = Experience(state=state, action=action, reward=reward, next_state=next_state,
                                                    done=done, id=self.counter, td_error=td_error)
