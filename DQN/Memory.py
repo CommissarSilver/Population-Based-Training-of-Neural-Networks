@@ -1,4 +1,5 @@
 import random
+import numpy as np
 
 
 # creates a replay buffer with prioritized experience replay
@@ -94,7 +95,7 @@ class Experience:
 
 class Memory:
     # here we create our agent's memory
-    def __init__(self, a, maximum_length=100000):
+    def __init__(self, a, maximum_length=1000000):
         self.buffer = {}  # replay buffer
         self.counter = 0  # keeps count of how many experiences we've had
         self.sum_probs = 0  # sum of all experiences' probabilities
@@ -111,16 +112,19 @@ class Memory:
         #   deletes a random memory and adds the new experience in its stead.
         self.counter += 1
         if len(self.buffer.keys()) + 1 < self.max_len:
-            self.buffer[self.counter] = Experience(state=state, action=action, reward=reward,
-                                                   next_state=next_state, done=done, id=self.counter,
-                                                   td_error=td_error)
+            self.buffer[self.counter] = Experience(state=np.asarray(state), action=np.asarray(action),
+                                                   reward=np.asarray(reward), next_state=np.asarray(next_state),
+                                                   done=np.asarray(done), id=self.counter, td_error=td_error)
             self.sum_probs += td_error ** self.a
         else:
             rand_idx = random.choice(list(self.buffer.keys()))
             self.sum_probs -= (self.buffer[rand_idx].td_error ** self.a)
             del self.buffer[rand_idx]
-            self.buffer[self.counter] = Experience(state=state, action=action, reward=reward, next_state=next_state,
-                                                   done=done, id=self.counter, td_error=td_error)
+            self.buffer[self.counter] = Experience(state=np.asarray(state), action=np.asarray(action),
+                                                   reward=np.asarray(reward),
+                                                   next_state=np.asarray(next_state), done=np.asarray(done),
+                                                   id=self.counter,
+                                                   td_error=td_error)
             self.sum_probs += td_error ** self.a
 
     def sample(self, batch_size):
@@ -134,5 +138,15 @@ class Memory:
         batch_probs = [random.uniform(0, tree.value) for _ in range(batch_size)]
         batch = retrieve(tree, batch_probs)
         sample = [self.buffer[i] for i in batch]
-
-        return sample
+        states = np.zeros((batch_size, 84, 84, 4))
+        next_states = np.zeros((batch_size, 84, 84, 4))
+        actions = np.zeros((batch_size, 3))
+        rewards = np.zeros((batch_size, 1))
+        terminals = np.zeros((batch_size, 1),dtype=np.bool)
+        for index,i in enumerate(batch):
+            states[index] = self.buffer[i].state
+            next_states[index] = self.buffer[i].next_state
+            actions[index] = self.buffer[i].action
+            rewards[index] = self.buffer[i].reward
+            terminals[index] = self.buffer[i].done
+        return states, actions, rewards, next_states, terminals

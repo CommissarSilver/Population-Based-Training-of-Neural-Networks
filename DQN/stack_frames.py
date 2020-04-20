@@ -18,9 +18,9 @@ def stack_frames(stacked_frames, state, is_new_episode, stack_size=4):
     # the stack
     if is_new_episode:
         for i in range(stack_size):
-            stacked_frames.append(frame)
+            stacked_frames[:, :, i] = frame
 
     else:
-        stacked_frames.append(frame)
+        stacked_frames[:, :, -1] = frame
 
     return stacked_frames

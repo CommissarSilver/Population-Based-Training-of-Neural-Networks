@@ -4,7 +4,7 @@ import Memory
 
 
 def model_architecture(inputs_shape, output_shape):
-    input_layer = tf.keras.Input(shape=inputs_shape, name='Input_Layer')
+    input_layer = tf.keras.layers.Input(shape=inputs_shape, name='Input_Layer')
     conv_layer1 = tf.keras.layers.Conv2D(filters=32,
                                          kernel_size=[8, 8],
                                          strides=[4, 4],
@@ -66,4 +66,4 @@ class Agent:
         self.optimizer = tf.keras.optimizers.Adam(0.00001)  # hyperparameter
         self.actions = actions
         if not target_network:
-            self.memory = Memory.Memory(a=0.1, maximum_length=10000)
+            self.memory = Memory.Memory(a=0.1, maximum_length=1000000)
