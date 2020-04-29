@@ -44,8 +44,7 @@ def model_architecture(inputs_shape, output_shape):
     # flattening the last layers outputs. We do this so we can use them as inputs to a dense layer
     value_stream, advantage_stream = tf.keras.layers.Lambda(lambda w: tf.split(w, 2, 3))(conv_layer3_batchnorm)
     value_stream = tf.keras.layers.Flatten()(value_stream)
-    value_layer = tf.keras.layers.Dense(units=1,
-                                        kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.))(
+    value_layer = tf.keras.layers.Dense(units=1, kernel_initializer=tf.keras.initializers.VarianceScaling(scale=2.))(
         value_stream)
 
     advantage_stream = tf.keras.layers.Flatten()(advantage_stream)
