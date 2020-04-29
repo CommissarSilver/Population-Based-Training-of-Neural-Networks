@@ -1,6 +1,6 @@
 import tensorflow as tf
-import numpy as np
-import Memory
+import sumtree
+import prioritized_experience_replay
 
 
 def model_architecture(inputs_shape, output_shape):
@@ -61,9 +61,14 @@ def model_architecture(inputs_shape, output_shape):
 
 class Agent:
     # Here we implement the agent's neural model
-    def __init__(self, input_shape, output_shape, actions, hyper_parameters, target_network=False):
+    def __init__(self, input_shape, output_shape, actions, learning_rate, a, memory_capacity, target_network=False):
         self.model = model_architecture(inputs_shape=input_shape, output_shape=output_shape)
-        self.optimizer = tf.keras.optimizers.Adam(0.00001)  # hyperparameter
+        self.optimizer = tf.keras.optimizers.Adam(learning_rate)  # hyperparameter
         self.actions = actions
+
         if not target_network:
-            self.memory = Memory.Memory(a=0.1, maximum_length=1000000)
+            self.replay_buffer = prioritized_experience_replay.Memory(input_shape=(input_shape[0], input_shape[1]),
+                                                                      stack_size=input_shape[2],
+                                                                      num_actions=output_shape,
+                                                                      a=a,
+                                                                      max_len=memory_capacity)
