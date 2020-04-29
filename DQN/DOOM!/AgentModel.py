@@ -60,7 +60,8 @@ def model_architecture(inputs_shape, output_shape):
 
 class Agent:
     # Here we implement the agent's neural model
-    def __init__(self, input_shape, output_shape, actions, learning_rate, a, memory_capacity, target_network=False):
+    def __init__(self, input_shape, output_shape, actions, learning_rate, a, memory_capacity, target_network=False,
+                 shared_replay_buffer=True):
         self.model = model_architecture(inputs_shape=input_shape, output_shape=output_shape)
         self.optimizer = tf.keras.optimizers.Adam(learning_rate)  # hyperparameter
         self.actions = actions
@@ -71,3 +72,5 @@ class Agent:
                                                                       num_actions=output_shape,
                                                                       a=a,
                                                                       max_len=memory_capacity)
+        if shared_replay_buffer:
+            self.replay_buffer = None
