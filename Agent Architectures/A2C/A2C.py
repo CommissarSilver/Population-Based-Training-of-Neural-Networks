@@ -9,30 +9,32 @@ import threading
 class MasterAgent:
     def __init__(self, input_shape, possible_actions, hyper_params, optimizer):
 
-        self.agent_model = model.A2C(input_shape, possible_actions, hyper_params, optimizer)
-        self.model = self.agent_model.model  # the agent's neural network
+        self.model = model.build_model(input_shape, possible_actions)  # the agent's neural network
+        self.optimizer = optimizer
+        self.learning_rate = hyper_params['learning_rate']
         self.discount_factor = hyper_params['discount_factor']
-        self.number_of_slaves = hyper_params['slaves_num']
-        self.experiences = []  # s list containing each master agents' slaves experiences
-        self.slaves = [Agent(self) for i in range(self.number_of_slaves)]
+        self.number_of_minions = hyper_params['minions_num']
+        self.experiences = []  # s list containing each master agents' minions experiences
+        self.minions = [Minion(self) for i in range(5)]
 
-    def gather_experience(self):
+    def gather_experience(self, turns=20):
 
-        for agent in self.slaves:
-            agent.model.set_weights(self.model.get_weights())  # copy master agent's network weights to all the slave
+        for minion in self.minions:
+            minion.model.set_weights(self.model.get_weights())  # copy master agent's network weights to all the minion
             # agents
-        slave_threads = []
+        minion_threads = []
 
-        for slave in self.slaves:
-            t = threading.Thread(target=slave.play, args=(1,))
-            slave_threads.append(t)
-            t.start()  # start salve agents
+        for turn in range(turns):
+            for minion in self.minions:
+                thread = threading.Thread(target=minion.play)
+                minion_threads.append(thread)
+                thread.start()  # start salve agents
 
-        for slave_thread in slave_threads:
-            slave_thread.join()  # wait until all salve agents are done
+            for minion_thread in minion_threads:
+                minion_thread.join()  # wait until all salve agents are done
 
-        for slave in self.slaves:
-            self.experiences.append(slave.episode_info)  # store slave agent's experience for training
+            for minion in self.minions:
+                self.experiences.append(minion.episode_info)  # store minion agent's experience for training
 
     def train(self):
         self.gather_experience()
@@ -52,24 +54,24 @@ class MasterAgent:
                 loss = tf.reduce_sum(actor_loss) + tf.multiply(0.1, tf.reduce_sum(critic_loss))
             variables = self.model.trainable_variables
             gradients = tape.gradient(loss, variables)
-            self.agent_model.optimizer.apply_gradients(zip(gradients, variables))
+            self.optimizer.apply_gradients(zip(gradients, variables))
 
-            for agent in self.slaves:  # empty slaves agents' memory
-                agent.episode_info = {'states': [], 'rewards': []}
+            for minion in self.minions:  # empty minion agents' memory
+                minion.episode_info = {'states': [], 'rewards': []}
 
     def test(self):
         # test the agent to see how well it performs
-        for agent in self.slaves:
-            agent.model.set_weights(self.model.get_weights())
-        slave_threads = []
+        for minion in self.minions:
+            minion.model.set_weights(self.model.get_weights())
+        minion_threads = []
 
-        for slave in self.slaves:
-            t = threading.Thread(target=slave.play, args=(100,))
-            slave_threads.append(t)
-            t.start()
+        for minion in self.minions:
+            thread = threading.Thread(target=minion.play)
+            minion_threads.append(thread)
+            thread.start()
 
 
-class Agent:
+class Minion:
     def __init__(self, master_agent: MasterAgent):
         self.model = tf.keras.models.clone_model(master_agent.model)  # clone MasterAgent's network architecture
         self.model.set_weights(master_agent.model.get_weights())
@@ -89,23 +91,22 @@ class Agent:
         self.episode_info['states'].append(state.reshape(84, 84, 4))
         self.episode_info['rewards'].append(reward)
 
-    def play(self, turns):
-        for turn in range(turns):
-            self.environment.new_episode()
-            game_start = True
-            if game_start:
-                state = np.zeros((84, 84, 4))
-                state = stack_frames.stack_frames(state, self.environment.get_state().screen_buffer, True)
-                self.step(state.reshape(1, 84, 84, 4))
-                game_start = False
-            while not self.environment.is_episode_finished():
-                state = stack_frames.stack_frames(state, self.environment.get_state().screen_buffer, False)
-                self.step(state.reshape(1, 84, 84, 4))
+    def play(self):
+        self.environment.new_episode()
+        game_start = True
+        if game_start:
+            state = np.zeros((84, 84, 4))
+            state = stack_frames.stack_frames(state, self.environment.get_state().screen_buffer, True)
+            self.step(state.reshape(1, 84, 84, 4))
+            game_start = False
+        while not self.environment.is_episode_finished():
+            state = stack_frames.stack_frames(state, self.environment.get_state().screen_buffer, False)
+            self.step(state.reshape(1, 84, 84, 4))
 
 
 def main(train_or_test):
     agent1 = MasterAgent((84, 84, 4), [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-                         {'learning_rate': 0.001, 'discount_factor': 0.95, 'slaves_num': 10},
+                         {'learning_rate': 0.001, 'discount_factor': 0.95, 'minions_num': 4},
                          tf.keras.optimizers.Adam(1e-4))
     agent1.model.load_weights('Master-50.h5')
     print('loading model')
