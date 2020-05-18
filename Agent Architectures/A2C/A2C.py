@@ -7,21 +7,22 @@ import threading
 
 
 class MasterAgent:
-    def __init__(self, input_shape, possible_actions, hyper_params, optimizer):
+    def __init__(self, input_shape, possible_actions, hyper_params):
 
         self.model = model.build_model(input_shape, len(possible_actions))  # the agent's neural network
-        self.optimizer = optimizer
         self.learning_rate = hyper_params['learning_rate']
+        self.optimizer = tf.keras.optimizers.Adam(1e-4)
         self.discount_factor = hyper_params['discount_factor']
         self.number_of_minions = hyper_params['minions_num']
         self.experiences = []  # s list containing each master agents' minions experiences
-        self.minions = [Minion(self) for i in range(10)]
+        self.minions = [Minion(self) for i in range(5)]
 
     def gather_experience(self):
-
+        print('     playing')
         for minion in self.minions:
             minion.model.set_weights(self.model.get_weights())  # copy master agent's network weights to all the minion
             # agents
+
         minion_threads = []
 
         for minion in self.minions:
@@ -37,7 +38,7 @@ class MasterAgent:
 
     def train(self):
         self.gather_experience()
-
+        print('     training')
         for episode in self.experiences:
             returns = np.zeros((len(episode['rewards']), 1))
             ret = 0
@@ -57,6 +58,7 @@ class MasterAgent:
 
             for minion in self.minions:  # empty minion agents' memory
                 minion.episode_info = {'states': [], 'rewards': []}
+            return loss.numpy()
 
     def test(self):
         # test the agent to see how well it performs
@@ -79,8 +81,8 @@ class Minion:
         self.frame_skip = 4
 
     def step(self, state):
-        state_value, action_logits = self.model.predict(state)
-        actions_distribution = tf.nn.softmax(action_logits).numpy()[0]  # get a softmax distribution over action logits
+        state_value, action_logprobs = self.model.predict(state)
+        actions_distribution = action_logprobs[0]  # get a softmax distribution over action logits
         actions = [0, 1, 2]
         action_to_take = self.possible_actions[np.random.choice(actions, p=actions_distribution)]  # select an action
         # from the possible actions according to the action distribution
@@ -103,17 +105,21 @@ class Minion:
             self.step(state.reshape(1, 84, 84, 4))
 
 
-def main(train_or_test):
-    agent1 = MasterAgent((84, 84, 4), [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-                         {'learning_rate': 0.9, 'discount_factor': 0.95, 'minions_num': 4},
-                         tf.keras.optimizers.RMSprop(0.9))
-    agent1.model.load_weights('Master-5050.h5')
-    print('loading model')
+def main( train_or_test):
+    master_agent = MasterAgent((84, 84, 4), [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+                             {'learning_rate': 0.9, 'discount_factor': 0.95, 'minions_num': 10})
+    master_agent.model.load_weights('Master-10.h5')
+    print('     loading model')
 
     for i in range(10):
-        agent1.train()
-#
-    agent1.model.save('Master-5050.h5')
-    print('model saved')
-# # else:
-# #     agent1.test()
+        master_agent.train()
+    # #
+    master_agent.model.save('Master-10.h5')
+    print('     model saved')
+
+
+# # # else:
+# # #     agent1.test()
+
+
+# main( 'train')
