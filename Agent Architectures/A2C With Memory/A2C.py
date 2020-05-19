@@ -17,16 +17,6 @@ class Agent:
         self.optimizer = tf.keras.optimizers.RMSprop(self.learning_rate)
         self.minions = [Minion(self) for i in range(hyper_params['minions_num'])]
 
-    def gather_experience(self):
-        self.experiences = {'episode_{0}'.format(i): {'states': [], 'rewards': [], 'values': [], 'action_logprobs': []}
-                            for i in range(self.memory_size)}
-        print(' -Gathering Experience-')
-        episode_num = 0
-        for i in range(self.memory_size):
-            print('     -Playing Episode {0}'.format(episode_num + 1))
-
-            episode_num += 1
-
     def train(self):
         minion_threads = [threading.Thread(target=minion.play) for minion in self.minions]
         for minion_thread in minion_threads:
