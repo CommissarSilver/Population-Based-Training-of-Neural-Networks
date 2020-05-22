@@ -2,7 +2,6 @@ import tensorflow as tf
 import A2C
 import random
 
-import numpy as np
 
 gpu = tf.config.experimental.list_physical_devices('GPU')
 tf.config.experimental.set_memory_growth(gpu[0], True)

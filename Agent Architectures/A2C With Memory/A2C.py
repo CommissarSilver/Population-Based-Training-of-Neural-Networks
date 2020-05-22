@@ -16,11 +16,11 @@ class Agent:
         self.optimizer = tf.keras.optimizers.RMSprop(self.learning_rate)
         self.minions = [Minion(self) for i in range(self.hyper_params['minions_num'])]
 
-    def train(self, training_iters,id):
+    def train(self, training_iters, id):
         avg_returns = []
 
         for i in range(training_iters):
-            print('     -> Worker {} Training Iteration {}'.format(id,i))
+            print('     -> Worker {} Training Iteration {}'.format(id, i))
             minion_threads = [threading.Thread(target=minion.play) for minion in self.minions]
 
             for minion_thread in minion_threads:
@@ -59,7 +59,7 @@ class Agent:
 
             avg_returns.append(np.average(returns))
 
-        return np.mean(avg_returns)
+        return np.average(avg_returns)
 
 
 class Minion:
@@ -67,7 +67,7 @@ class Minion:
         self.model = tf.keras.models.clone_model(master_agent.model)
         self.environment, self.possible_actions = environment.create_environment()
         self.frame_skip = 4
-        self.memory = {'states': [], 'rewards': []}
+        self.memory = {'states': [], 'actions': [], 'rewards': []}
 
     def step(self, state):
         state_reshaped = np.asarray(state).T.reshape(1, 84, 84, 4)
