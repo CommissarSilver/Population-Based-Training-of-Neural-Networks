@@ -44,15 +44,16 @@ class Agent:
 
                 with tf.GradientTape() as tape:
                     state_values, action_logprobs = self.model(np.asarray(experience['states']))
-                    actor_loss = -1 * tf.multiply(action_logprobs,
-                                                  tf.math.subtract(tf.stop_gradient(state_values), returns))
-                    critic_loss = tf.math.pow(tf.math.subtract(state_values, returns), 2)
-                    loss = tf.reduce_sum(actor_loss) + tf.multiply(0.1, tf.reduce_sum(critic_loss))
-                    losses.append(loss)
+                    responsible_outputs = action_logprobs * experience['actions']
+                    actor_loss = -1 * tf.reduce_sum(
+                        tf.multiply(responsible_outputs, tf.math.subtract(state_values, returns)))
+                    critic_loss = 0.5 * tf.reduce_sum(tf.math.pow(tf.math.subtract(state_values, returns), 2))
+                    entropy = -1 * tf.reduce_sum(action_logprobs * tf.math.log(action_logprobs))
+                    loss = (0.5 * critic_loss) + actor_loss - (entropy * 0.01)
 
-            variables = self.model.trainable_variables
-            gradients = tape.gradient(losses, variables)
-            self.optimizer.apply_gradients(zip(gradients, variables))
+                variables = self.model.trainable_variables
+                gradients = tape.gradient(loss, variables)
+                self.optimizer.apply_gradients(zip(gradients, variables))
 
             for minion in self.minions:
                 minion.update(self.model)
@@ -76,14 +77,15 @@ class Minion:
         actions = [0, 1, 2]
         action_to_take = self.possible_actions[np.random.choice(actions, p=actions_distribution)]  # select an action
         # from the possible actions according to the action distribution
-        reward = self.environment.make_action(action_to_take, self.frame_skip)
+        reward = self.environment.make_action(action_to_take, 2)
 
         # store what happened in agent's memory
         self.memory['states'].append(np.asarray(state).T)
+        self.memory['actions'].append(action_to_take)
         self.memory['rewards'].append(reward)
 
     def play(self):
-        self.memory = {'states': [], 'rewards': []}
+        self.memory = {'states': [], 'actions': [], 'rewards': []}
         self.environment.new_episode()
         game_start = True
 
@@ -102,13 +104,16 @@ class Minion:
 
 def main(train_or_test):
     master_agent = Agent((84, 84, 4), [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-                         {'learning_rate': 0.9, 'discount_factor': 0.95, 'minions_num': 5})
+                         {'learning_rate': 0.0001, 'discount_factor': 0.95, 'minions_num': 5})
     # master_agent.model.load_weights('Master-10.h5')
     print('     loading model')
 
     for i in range(100):
         print('Round: ', i)
-        master_agent.train()
+        master_agent.train(1, i)
     # #
     master_agent.model.save('Master-10.h5')
     print('     model saved')
+
+
+main('train')

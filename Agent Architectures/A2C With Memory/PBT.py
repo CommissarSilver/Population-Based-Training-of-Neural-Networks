@@ -23,7 +23,7 @@ def create_worker(TRAIN_ITERS, best_worker_id, hyper_params, i, queue):
 
 
 def explore(hyper_params):
-    j = random.uniform(0.8, 1.2)  # perturbs the agents learning rate
+    j = random.uniform(0.7, 1.5)  # perturbs the agents learning rate
     hyper_params['learning_rate'] *= j
     return hyper_params
 
