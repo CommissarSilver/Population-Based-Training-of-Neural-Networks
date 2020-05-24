@@ -12,7 +12,7 @@ def stack_frames(stacked_frames, state, is_new_episode, stack_size=4):
     #   Calls the preprocess function on each new frame and then stacks #stack_size of frames together in a deque.
 
     # preprocess the frame
-    frame = preprocess_frame(state)
+    frame = preprocess_frame(state).T
     # if we're in a new episode create a new deque and stack four of the first frames in it. if not just add it to the stack
     if is_new_episode:
         for i in range(stack_size):
