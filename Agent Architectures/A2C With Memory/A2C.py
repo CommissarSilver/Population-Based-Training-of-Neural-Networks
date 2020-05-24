@@ -5,115 +5,87 @@ import model
 import stack_frames
 import threading
 from collections import deque
+import copy
+from matplotlib import pyplot as plt
 
 
-class Agent:
+class Master:
     def __init__(self, input_shape, possible_actions, hyper_params):
-        self.model = model.build_model(input_shape, len(possible_actions))  # the agent's neural network
-        self.hyper_params = hyper_params
-        self.discount_factor = self.hyper_params['discount_factor']
-        self.learning_rate = self.hyper_params['learning_rate']
-        self.optimizer = tf.keras.optimizers.RMSprop(self.learning_rate)
-        self.minions = [Minion(self) for i in range(self.hyper_params['minions_num'])]
+        self.model = model.build_model(input_shape, len(possible_actions))
+        self.learning_rate = hyper_params['learning_rate']
+        self.discount_factor = hyper_params['discount_factor']
+        self.minions = [Minion(self) for _ in range(hyper_params['minions_num'])]
 
-    def train(self, training_iters, id):
-        avg_returns = []
-
-        for i in range(training_iters):
-            print('     -> Worker {} Training Iteration {}'.format(id, i))
-            minion_threads = [threading.Thread(target=minion.play) for minion in self.minions]
-
+    def learn(self, epochs):
+        total_rewards = []
+        for epoch in range(epochs):
+            print(epoch)
+            epoch_rewards = []
+            minion_threads = [threading.Thread(target=minion.play, args=(epoch_rewards,)) for minion in self.minions]
             for minion_thread in minion_threads:
                 minion_thread.start()
-
             for minion_thread in minion_threads:
                 minion_thread.join()
-
-            experiences = [minion.memory for minion in self.minions]
-            losses = []
-
-            for experience in experiences:
-                returns = np.zeros((len(experience['rewards']), 1))
-                ret = 0
-
-                for r in reversed(
-                        range(len(experience['rewards']))):  # calculate discounted rewards for the entire episode
-                    ret = experience['rewards'][r] + self.discount_factor * ret
-                    returns[r] = ret
-                returns = tf.linalg.normalize(returns)[0].numpy()
-
-                with tf.GradientTape() as tape:
-                    state_values, action_logprobs = self.model(np.asarray(experience['states']))
-                    responsible_outputs = action_logprobs * experience['actions']
-                    actor_loss = -1 * tf.reduce_sum(
-                        tf.multiply(responsible_outputs, tf.math.subtract(state_values, returns)))
-                    critic_loss = 0.5 * tf.reduce_sum(tf.math.pow(tf.math.subtract(state_values, returns), 2))
-                    entropy = -1 * tf.reduce_sum(action_logprobs * tf.math.log(action_logprobs))
-                    loss = (0.5 * critic_loss) + actor_loss - (entropy * 0.01)
-
-                variables = self.model.trainable_variables
-                gradients = tape.gradient(loss, variables)
-                self.optimizer.apply_gradients(zip(gradients, variables))
-
-            for minion in self.minions:
-                minion.update(self.model)
-
-            avg_returns.append(np.average(returns))
-
-        return np.average(avg_returns)
+            total_rewards.append(np.average(epoch_rewards))
+        return total_rewards
 
 
 class Minion:
-    def __init__(self, master_agent: Agent):
-        self.model = tf.keras.models.clone_model(master_agent.model)
+    def __init__(self, master: Master):
+        self.model = master.model
         self.environment, self.possible_actions = environment.create_environment()
-        self.frame_skip = 4
-        self.memory = {'states': [], 'actions': [], 'rewards': []}
+        self.actions = [0, 1, 2]
+        self.gamma = master.discount_factor
+        self.optimizer = tf.keras.optimizers.RMSprop(1e-4)
 
-    def step(self, state):
-        state_reshaped = np.asarray(state).T.reshape(1, 84, 84, 4)
-        state_value, action_logprobs = self.model.predict(state_reshaped)
-        actions_distribution = action_logprobs[0]  # get a softmax distribution over action logits
-        actions = [0, 1, 2]
-        action_to_take = self.possible_actions[np.random.choice(actions, p=actions_distribution)]  # select an action
-        # from the possible actions according to the action distribution
-        reward = self.environment.make_action(action_to_take, 2)
-
-        # store what happened in agent's memory
-        self.memory['states'].append(np.asarray(state).T)
-        self.memory['actions'].append(action_to_take)
-        self.memory['rewards'].append(reward)
-
-    def play(self):
-        self.memory = {'states': [], 'actions': [], 'rewards': []}
+    def play(self, epoch_rewards):
+        variables = self.model.trainable_variables
         self.environment.new_episode()
-        game_start = True
+        game_terminated = False
+        state = deque([np.zeros((84, 84), dtype=np.int) for _ in range(4)], maxlen=4)
+        state = stack_frames.stack_frames(state, self.environment.get_state().screen_buffer, True)
+        episode_rewards = []
+        step_num = 0
+        while not  self.environment.is_episode_finished():
+            with tf.GradientTape() as tape:
 
-        if game_start:
-            state = deque([np.zeros((84, 84), dtype=np.int) for _ in range(4)], maxlen=4)
-            state = stack_frames.stack_frames(state, self.environment.get_state().screen_buffer, True)
-            self.step(state)
-            game_start = False
-        while not self.environment.is_episode_finished():
-            state = stack_frames.stack_frames(state, self.environment.get_state().screen_buffer, False)
-            self.step(state)
+                state_value, actions_probabilities = self.model(np.asarray(state).reshape(1, 84, 84, 4))
+                action_distribution = actions_probabilities[0].numpy() / np.sum(actions_probabilities[0].numpy())
+                # print(action_distribution)
+                action_to_take = self.possible_actions[np.random.choice(self.actions, p=action_distribution)]
+                reward = self.environment.make_action(action_to_take, 4)
+                episode_rewards.append(reward)
+                if not self.environment.is_episode_finished():
+                    next_state = stack_frames.stack_frames(copy.deepcopy(state),
+                                                           self.environment.get_state().screen_buffer,
+                                                           False)
+                    state = copy.deepcopy(next_state)
+                else:
+                    next_state = np.zeros((84, 84, 4))
+                    game_terminated = True
 
-    def update(self, master_model):
-        self.model.set_weights(master_model.get_weights())
+                next_state_value, next_action_probabilities = self.model(np.asarray(next_state).reshape(1, 84, 84, 4))
+                responsible_action = tf.reduce_sum(actions_probabilities * action_to_take)
+
+                advantage = reward + (self.gamma * next_state_value - state_value)
+                entropy = -tf.reduce_sum(actions_probabilities * tf.math.log(actions_probabilities))
+                critic_loss = 0.5 * advantage ** 2
+                actor_loss = -tf.reduce_sum(tf.math.log(responsible_action) * advantage)
+
+                loss = 0.5 * critic_loss + actor_loss - entropy * 0.01
+                # print(loss)
+
+            gradients, global_norm = tf.clip_by_global_norm(tape.gradient(loss, variables), 40.0)
+            self.optimizer.apply_gradients(zip(gradients, variables))
+        epoch_rewards.append(np.average(episode_rewards))
 
 
-def main(train_or_test):
-    master_agent = Agent((84, 84, 4), [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-                         {'learning_rate': 0.0001, 'discount_factor': 0.95, 'minions_num': 5})
-    # master_agent.model.load_weights('Master-10.h5')
-    print('     loading model')
+master_agent = Master((84, 84, 4), [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+                      {'learning_rate': 0.0001, 'discount_factor': 0.95, 'minions_num': 5})
 
-    for i in range(100):
-        print('Round: ', i)
-        master_agent.train(1, i)
-    # #
-    master_agent.model.save('Master-10.h5')
-    print('     model saved')
-
-
-main('train')
+total_rewards = master_agent.learn(200)
+master_model = master_agent.model
+master_model.save('j200.h5')
+plt.plot([i for i in range(len(total_rewards))], total_rewards)
+plt.show()
+print('hi')
