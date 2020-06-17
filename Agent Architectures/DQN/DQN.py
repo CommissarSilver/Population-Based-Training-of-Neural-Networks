@@ -24,20 +24,20 @@ class DQN:
         self.gamma = self.hyper_parameters['gamma']
         self.learning_rate = self.hyper_parameters['learning_rate']
 
-        self.dqn_agent = AgentModel.Agent(input_shape=(self.input_shape[0], self.input_shape[1], self.stack_size),
-                                          output_shape=len(self.possible_actions),
-                                          actions=self.possible_actions,
-                                          learning_rate=self.learning_rate,
-                                          a=self.hyper_parameters['a'],
-                                          memory_capacity=10000,
-                                          target_network=False)
-        self.dqn_target = AgentModel.Agent(input_shape=(self.input_shape[0], self.input_shape[1], self.stack_size),
+        self.dqn_agent = AgentModel.Minion(input_shape=(self.input_shape[0], self.input_shape[1], self.stack_size),
                                            output_shape=len(self.possible_actions),
                                            actions=self.possible_actions,
                                            learning_rate=self.learning_rate,
                                            a=self.hyper_parameters['a'],
                                            memory_capacity=10000,
-                                           target_network=True)
+                                           target_network=False)
+        self.dqn_target = AgentModel.Minion(input_shape=(self.input_shape[0], self.input_shape[1], self.stack_size),
+                                            output_shape=len(self.possible_actions),
+                                            actions=self.possible_actions,
+                                            learning_rate=self.learning_rate,
+                                            a=self.hyper_parameters['a'],
+                                            memory_capacity=10000,
+                                            target_network=True)
 
     def train(self):
         batch_states, batch_actions, batch_rewards, batch_next_states, batch_terminals = self.dqn_agent.replay_buffer.sample(
