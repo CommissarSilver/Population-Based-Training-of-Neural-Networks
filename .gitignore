@@ -1,0 +1,27 @@
+Agent Architectures/_vizdoom.ini
+Agent Architectures/Agent-0 Model.h5
+Agent Architectures/Agent-2 Model.h5
+Agent Architectures/Agent-1 Model.h5
+Agent Architectures/Agent-4 Model.h5
+Agent Architectures/Agent-3 Model.h5
+Agent Architectures/A2C/__pycache__/A2C.cpython-37.pyc
+Agent Architectures/A2C/__pycache__/environment.cpython-37.pyc
+Agent Architectures/A2C/__pycache__/preprocess_frame.cpython-37.pyc
+Agent Architectures/A2C/__pycache__/model.cpython-37.pyc
+Agent Architectures/A2C/__pycache__/stack_frames.cpython-37.pyc
+Agent Architectures/A2C With Memory/__pycache__/model.cpython-37.pyc
+Agent Architectures/A2C With Memory/__pycache__/PBT.cpython-37.pyc
+Agent Architectures/A2C With Memory/__pycache__/preprocess_frame.cpython-37.pyc
+Agent Architectures/A2C With Memory/__pycache__/stack_frames.cpython-37.pyc
+Agent Architectures/Policy Gradients/__pycache__/environment.cpython-37.pyc
+Agent Architectures/Policy Gradients/__pycache__/NeuralModel.cpython-37.pyc
+Agent Architectures/Policy Gradients/__pycache__/play_episode.cpython-37.pyc
+Agent Architectures/Policy Gradients/__pycache__/PolicyGradient.cpython-37.pyc
+Agent Architectures/Policy Gradients/__pycache__/preprocess_frame.cpython-37.pyc
+Agent Architectures/Policy Gradients/__pycache__/stack_frames.cpython-37.pyc
+Agent Architectures/A2C With Memory/__pycache__/A2C.cpython-37.pyc
+Agent Architectures/A2C With Memory/__pycache__/environment.cpython-37.pyc
+Agent Architectures/A2C With Memory/j200.h5
+Agent Architectures/A2C With Memory/j200-entire_critic_loss.h5
+Agent Architectures/A2C With Memory/Argus.rar
+Agent Architectures/A2C With Memory/Argus - N-Step.rar

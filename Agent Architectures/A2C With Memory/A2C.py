@@ -8,14 +8,24 @@ from collections import deque
 import copy
 from matplotlib import pyplot as plt
 
+# needed changes and review:
+# unify the hyperparams thingies. there are too many instances that are floating around.
+#       is number of minions a hyperparam?????
+#       is discount factor a hyperparam?????
+#       is number of steps a hyperparam?????
+
 
 class Master:
     def __init__(self, input_shape, possible_actions, hyper_params):
-        self.model = model.build_model(input_shape, len(possible_actions))  # Master Agent's neural model
+        self.model = model.build_model(input_shape, len(
+            possible_actions))  # Master Agent's neural model
         self.hyper_params = hyper_params
-        self.learning_rate = self.hyper_params['learning_rate']  # we'll tune these in PBT
-        self.discount_factor = self.hyper_params['discount_factor']  # we'll tune these in PBT
-        self.minions = [Minion(self, i) for i in range(self.hyper_params['minions_num'])]  # static for now
+        # we'll tune these in PBT
+        self.learning_rate = self.hyper_params['learning_rate']
+        # we'll tune these in PBT
+        self.discount_factor = self.hyper_params['discount_factor']
+        self.minions = [Minion(self, i) for i in range(
+            self.hyper_params['minions_num'])]  # static for now
         self.n_steps = self.hyper_params['n_steps']  # we'll tune these in PBT
         self.memory = []  # contains minions experiences. resets after each training epoch
         self.optimizer = tf.keras.optimizers.Adam(self.learning_rate)
@@ -33,31 +43,42 @@ class Master:
                 thread.start()
             for thread in threads:
                 thread.join()
-            print(' ->Minion threads terminated. Training on ', self.n_steps, ' steps')
+            print(' ->Minion threads terminated. Training on ',
+                  self.n_steps, ' steps')
 
             for experience in self.memory:
                 states, actions, rewards = experience  # get the experiences
                 rewards_sum.append(np.sum(rewards))
                 with tf.GradientTape() as tape:
-                    states_values, actions_probabilities = self.model(np.asarray(states))
+                    states_values, actions_probabilities = self.model(
+                        np.asarray(states))
 
                     discounted_sum = 0
                     returns = []
                     for r in rewards:  # calculate discounted rewards
+                        # i think this needs some tinkering. is the logic correct?
                         discounted_sum = r + self.discount_factor * discounted_sum
                         returns.append(discounted_sum)
                     returns = np.asarray(returns)
 
-                    returns = (returns - np.mean(returns)) / (np.std(returns) + 0.001)  # normalize rewards
+                    returns = (returns - np.mean(returns)) / \
+                        (np.std(returns) + 0.001)  # normalize rewards
 
-                    responsible_actions = tf.reduce_sum(actions_probabilities * actions)  # get the actions the were
+                    responsible_actions = tf.reduce_sum(
+                        actions_probabilities * actions)  # get the actions the were
                     # actually executed
 
-                    advantage = tf.reduce_sum(returns - states_values)  # advantage function
-                    entropy = -tf.reduce_sum(actions_probabilities * tf.math.log(actions_probabilities))  # to force the
+                    advantage = tf.reduce_sum(
+                        returns - states_values)  # advantage function
+                    # to force the
+                    entropy = - \
+                        tf.reduce_sum(actions_probabilities *
+                                      tf.math.log(actions_probabilities))
                     # the agent to explore more and prevent premature degenerate probabilities
                     critic_loss = advantage ** 2
-                    actor_loss = -tf.reduce_sum(tf.math.log(responsible_actions) * advantage)
+                    actor_loss = - \
+                        tf.reduce_sum(tf.math.log(
+                            responsible_actions) * advantage)
 
                     loss = critic_loss + actor_loss - entropy * 0.01
 
@@ -88,19 +109,25 @@ class Minion:
     def step(self):  # takes a single step in the environment after being called. returns state observed,
         # action taken and reward received.
         if self.game_start:
-            self.state = deque([np.zeros((84, 84), dtype=np.int) for _ in range(4)], maxlen=4)
-            self.state = stack_frames.stack_frames(self.state, self.environment.get_state().screen_buffer, True)
+            self.state = deque([np.zeros((84, 84), dtype=np.int)
+                                for _ in range(4)], maxlen=4)
+            self.state = stack_frames.stack_frames(
+                self.state, self.environment.get_state().screen_buffer, True)
             self.game_start = False
         else:
-            self.state = stack_frames.stack_frames(self.state, self.environment.get_state().screen_buffer, False)
+            self.state = stack_frames.stack_frames(
+                self.state, self.environment.get_state().screen_buffer, False)
 
         reshaped_state = np.asarray(self.state).T
 
-        state_value, actions_probabilities = self.model.predict(np.expand_dims(reshaped_state, axis=0))
+        state_value, actions_probabilities = self.model.predict(
+            np.expand_dims(reshaped_state, axis=0))
 
-        action_distribution = actions_probabilities[0] / np.sum(actions_probabilities[0])
+        action_distribution = actions_probabilities[0] / \
+            np.sum(actions_probabilities[0])
 
-        action_to_take = self.possible_actions[np.random.choice(self.actions, p=action_distribution)]
+        action_to_take = self.possible_actions[np.random.choice(
+            self.actions, p=action_distribution)]
 
         reward = self.environment.make_action(action_to_take)
 
@@ -110,8 +137,8 @@ class Minion:
         if self.environment.is_episode_finished():
             print('     ->last session was finished')
             self.environment.new_episode()
-
-        self.game_start = True
+        # appended the self.game_start in the if clause. seems it was something which i missed.
+            self.game_start = True
 
         states, actions, rewards = [], [], []
         for step in range(self.master.n_steps):
@@ -121,8 +148,10 @@ class Minion:
                 actions.append(action)
                 rewards.append(reward)
 
-        print('     ->Minion ', self.minion_id, ' has played ', len(rewards), ' steps')
-        self.master.memory.append((states, actions, rewards))  # appends the experience in master's memory
+        print('     ->Minion ', self.minion_id,
+              ' has played ', len(rewards), ' steps')
+        # appends the experience in master's memory
+        self.master.memory.append((states, actions, rewards))
 
     def update_network(self, master_network):
         self.model.set_weights(master_network.get_weights())

@@ -5,12 +5,12 @@ import time
 
 # Here we create our DOOM! environment. We only use the create_environment function. The test_environment function is
 # only there to make sure we've installed ViZDoom correctly and it's working.
-
+# we're going to transition to a gym environment. whatever you're going to do, here you should create the new one.
 
 def create_environment():
     game = DoomGame()
-    game.load_config('basic.cfg')
-    game.set_doom_scenario_path('basic.wad')
+    game.load_config('A2C With Memory\\basic.cfg')
+    game.set_doom_scenario_path('A2C With Memory\\basic.wad')
     game.init()
     left = [1, 0, 0]
     right = [0, 1, 0]

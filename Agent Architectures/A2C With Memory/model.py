@@ -60,11 +60,11 @@ def build_model(input_shape, output_shape):
 
     return model
 
-
-class A2C:
-    def __init__(self, input_shape, possible_actions, hyper_params, optimizer):
-        self.input_shape = input_shape  # (frame width, frame height, stack size)
-        self.possible_actions = possible_actions  # one-hot possible actions
-        self.model = build_model(self.input_shape, len(self.possible_actions))
-        self.learning_rate = hyper_params['learning_rate']
-        self.optimizer = optimizer
+# We're not using this anymore. delete it entirley? 
+# class A2C:
+#     def __init__(self, input_shape, possible_actions, hyper_params, optimizer):
+#         self.input_shape = input_shape  # (frame width, frame height, stack size)
+#         self.possible_actions = possible_actions  # one-hot possible actions
+#         self.model = build_model(self.input_shape, len(self.possible_actions))
+#         self.learning_rate = hyper_params['learning_rate']
+#         self.optimizer = optimizer
