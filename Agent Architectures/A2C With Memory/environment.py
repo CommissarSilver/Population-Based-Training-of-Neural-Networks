@@ -1,47 +1,33 @@
-from vizdoom import *
-import random
-import time
+import gym
+from collections import deque
+import numpy as np
+import stack_frames
+
+# We've moved on from VizDOOM to gym's atari environment
 
 
-# Here we create our DOOM! environment. We only use the create_environment function. The test_environment function is
-# only there to make sure we've installed ViZDoom correctly and it's working.
-# we're going to transition to a gym environment. whatever you're going to do, here you should create the new one.
-
-def create_environment():
-    game = DoomGame()
-    game.load_config('A2C With Memory\\basic.cfg')
-    game.set_doom_scenario_path('A2C With Memory\\basic.wad')
-    game.init()
-    left = [1, 0, 0]
-    right = [0, 1, 0]
-    shoot = [0, 0, 1]
-    possible_actions = [left, right, shoot]
-
-    return game, possible_actions
+def create_environment(env_name='Breakout-v0'):
+    environment = gym.make(env_name)
+    observation_space = environment.observation_space
+    action_space = environment.action_space
+    return environment, observation_space, action_space
 
 
 def test_environment():
-    game = DoomGame()
-    game.load_config("basic.cfg")
-    game.set_doom_scenario_path("basic.wad")
-    game.init()
-    shoot = [0, 0, 1]
-    left = [1, 0, 0]
-    right = [0, 1, 0]
-    actions = [shoot, left, right]
+    environment = gym.make('Breakout-v0')
+    observation_space = environment.observation_space
+    action_space = environment.action_space
+    print(environment.unwrapped.get_action_meanings())
+    print('Observation space: ', observation_space)
+    print('Action space: ', action_space)
+    observation = environment.reset()
+    state = deque([np.zeros((84, 84)) for _ in range(4)], maxlen=4)
+    stacked_frames = stack_frames.stack_frames(state, observation, True)
+    for _ in range(1000):
+        environment.render()
+        observation, reward, done, info = environment.step(environment.action_space.sample())
+        stacked_frames = stack_frames.stack_frames(stacked_frames, observation, False)
+    environment.close()
 
-    episodes = 10
-    for i in range(episodes):
-        game.new_episode()
-        while not game.is_episode_finished():
-            state = game.get_state()
-            img = state.screen_buffer
-            misc = state.game_variables
-            action = random.choice(actions)
-            print(action)
-            reward = game.make_action(action)
-            print("\treward:", reward)
-            time.sleep(0.02)
-        print("Result:", game.get_total_reward())
-        time.sleep(2)
-    game.close()
+
+# test_environment()
