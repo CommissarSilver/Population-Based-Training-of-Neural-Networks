@@ -1,5 +1,6 @@
 from skimage import transform
 import numpy as np
+import show_frame
 
 
 def preprocess_frame(frame):
@@ -14,9 +15,11 @@ def preprocess_frame(frame):
     #   After that we normalize the cropped frame.
     #   Finally by using skimage's transform module we shrink the image even further and return the resulting matrix.
 
-    grayscale_frame = np.mean(frame, axis=0)  # convert from RGB to grayscale
-    cropped_frame = grayscale_frame[30:-10, 30:-30]  # crop the roof and the bottom info bar out
-    normalized_frame = cropped_frame / 255  # normalize the cropped frame
-    preprocessed_frame = transform.resize(normalized_frame, [84, 84])  # shrink the cropped frame
+    normalized_frame = np.mean(frame, axis=2)  # convert from RGB to grayscale
+
+    # cropped_frame = grayscale_frame[30:-10, 30:-30]  # crop the roof and the bottom info bar out
+    grayscale_frame = normalized_frame / 255  # normalize the cropped frame
+
+    preprocessed_frame = transform.resize(grayscale_frame, [84, 84])  # shrink the cropped frame
 
     return preprocessed_frame
