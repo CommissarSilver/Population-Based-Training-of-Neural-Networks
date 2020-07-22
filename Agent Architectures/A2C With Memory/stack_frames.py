@@ -1,4 +1,7 @@
 from preprocess_frame import *
+import show_frame
+import numpy as np
+
 
 def stack_frames(stacked_frames, state, is_new_episode, stack_size=4):
     # Arguments:
@@ -12,8 +15,10 @@ def stack_frames(stacked_frames, state, is_new_episode, stack_size=4):
     #   Calls the preprocess function on each new frame and then stacks #stack_size of frames together in a deque.
 
     # preprocess the frame
-    frame = preprocess_frame(state).T
-    # if we're in a new episode create a new deque and stack four of the first frames in it. if not just add it to the stack
+    frame = preprocess_frame(state)
+
+    # if we're in a new episode create a new deque and stack four of the first frames in it. if not just add it to
+    # the stack
     if is_new_episode:
         for i in range(stack_size):
             stacked_frames.append(frame)
