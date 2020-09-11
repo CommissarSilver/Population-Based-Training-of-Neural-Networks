@@ -1,5 +1,5 @@
 import gym
-from Agent import Agent
+from agent import Agent
 
 if __name__ == '__main__':
     env = gym.make('LunarLanderContinuous-v2')
