@@ -1,8 +1,8 @@
 import tensorflow as tf
 import os
 
-from ReplayBuffer import ReplayBuffer
-from Networks import ActorNetwork, CriticNetwork
+from replay_buffer import ReplayBuffer
+from networks import ActorNetwork, CriticNetwork
 
 
 class Agent:
