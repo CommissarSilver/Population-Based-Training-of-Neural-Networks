@@ -1,7 +1,7 @@
 import tensorflow as tf
 import tensorflow_probability as tfp
 import numpy as np
-from model import build_network
+from network import ActorCriticNetwork
 from minion import Minion
 import threading
 
@@ -16,7 +16,7 @@ class Master:
 
         self.minions = [Minion(self, environment, i) for i in range(initial_hyper_parameters['minions_num'])]
 
-        self.network = build_network(8, 4)
+        self.network = ActorCriticNetwork(observation_dims=8, output_dims=4)
         self.optimizer = tf.keras.optimizers.Adam(lr=self.learning_rate)
 
         self.states = []
@@ -33,8 +33,10 @@ class Master:
             self.discounted_rewards.clear()
             processes = []
             queue = []
+            lock = threading.Lock()
             for minion in self.minions:
-                process = threading.Thread(target=minion.play, args=(queue,))
+                # minion.play(queue)
+                process = threading.Thread(target=minion.play, args=(queue, lock))
                 processes.append(process)
             for process in processes:
                 process.start()
@@ -50,7 +52,7 @@ class Master:
 
             with tf.GradientTape() as tape:
                 for exp_num in range(len(self.states)):
-                    state_values, action_logits = self.network(np.asarray(self.states[exp_num]))
+                    state_values, action_logits = self.network(tf.convert_to_tensor(self.states[exp_num]))
                     action_probabilities = tf.nn.softmax(action_logits)
 
                     advantage = self.discounted_rewards[exp_num] - state_values
@@ -69,5 +71,5 @@ class Master:
 
 
 master = Master('LunarLander-v2',
-                {'learning_rate': 0.00005, 'discount_factor': 0.99, 'unroll_length': 50, 'minions_num': 5})
+                {'learning_rate': 0.0005, 'discount_factor': 0.99, 'unroll_length': 50, 'minions_num': 5})
 master.learn()
