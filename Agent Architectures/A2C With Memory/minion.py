@@ -40,45 +40,47 @@ class Minion:
         return discounted_rewards
 
     def choose_action(self, state):
-        action_logits = self.master.network(np.asarray([state]))[1]
+        j=tf.convert_to_tensor([state])
+        action_logits = self.master.network(tf.convert_to_tensor([state]))[1]
         action_probabilities = tf.nn.softmax(action_logits)
         action_distribution = tfp.distributions.Categorical(probs=action_probabilities, dtype=tf.float32)
         action = action_distribution.sample()
 
         return int(action.numpy()[0])
 
-    def play(self, mp_queue):
-        self.states.clear()
-        self.actions.clear()
-        self.rewards.clear()
-        step = 0
-        while (step < self.master.unroll_length and self.episode_finished == False):
-            action_to_take = self.choose_action(self.state)
-            next_state, reward, self.episode_finished, _ = self.environment.step(action_to_take)
-            # self.environment.render()
-            self.states.append(self.state)
-            self.actions.append(action_to_take)
-            self.rewards.append(reward)
-            self.cum_sum += reward
-            self.state = next_state
-            step += 1
+    def play(self, mp_queue,lock):
+        with lock:
+            self.states.clear()
+            self.actions.clear()
+            self.rewards.clear()
+            step = 0
+            while (step < self.master.unroll_length and self.episode_finished == False):
+                action_to_take = self.choose_action(self.state)
+                next_state, reward, self.episode_finished, _ = self.environment.step(action_to_take)
+                # self.environment.render()
+                self.states.append(self.state)
+                self.actions.append(action_to_take)
+                self.rewards.append(reward)
+                self.cum_sum += reward
+                self.state = next_state
+                step += 1
 
-        if self.episode_finished:
-            self.state = self.environment.reset()
-            self.episode_rewards.append(self.cum_sum)
-            self.episode_num += 1
+            if self.episode_finished:
+                self.state = self.environment.reset()
+                self.episode_rewards.append(self.cum_sum)
+                self.episode_num += 1
 
-            if self.episode_num % 20 == 0:
-                f = open('LunarLander - Single.csv', 'a')
-                f.write('{},{},{}\n'.format(self.id, self.episode_num, np.mean(self.episode_rewards[-20:])))
-                f.close()
+                if self.episode_num % 20 == 0:
+                    f = open('LunarLander - Single.csv', 'a')
+                    f.write('{},{},{}\n'.format(self.id, self.episode_num, np.mean(self.episode_rewards[-20:])))
+                    f.close()
 
-            if self.episode_num % 100 == 0:
+                # if self.episode_num % 100 == 0:
                 print(self.episode_num, ' -> ', self.id, ' -> ', np.mean(self.episode_rewards))
                 self.episode_rewards.clear()
 
-            self.cum_sum = 0
-            self.episode_finished = False
+                self.cum_sum = 0
+                self.episode_finished = False
 
-        mp_queue.append(
-            {'states': self.states, 'actions': self.actions, 'discounted_rewards': self.discount_rewards(self.rewards)})
+            mp_queue.append(
+                {'states': self.states, 'actions': self.actions, 'discounted_rewards': self.discount_rewards(self.rewards)})
