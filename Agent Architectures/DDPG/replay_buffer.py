@@ -4,7 +4,7 @@ import numpy as np
 class ReplayBuffer:
     def __init__(self, max_buffer_size, observation_shape, number_of_actions):
         self.max_buffer_size = max_buffer_size
-        self.observation_shape = observation_shape
+        self.observation_shape = [observation_shape]
         self.number_of_actions = number_of_actions
         self.memory_counter = 0
 
