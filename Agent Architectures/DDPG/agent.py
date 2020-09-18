@@ -1,33 +1,41 @@
 import tensorflow as tf
+import threading
 import os
 
 from replay_buffer import ReplayBuffer
-from networks import ActorNetwork, CriticNetwork
+from network import ActorNetwork, CriticNetwork
+from minion import Minion
 
 
 class Agent:
-    def __init__(self, alpha=0.000025, beta=0.00025, input_dims=[8], env=None, gamma=0.99, n_actions=2,
-                 max_size=10000000,
-                 tau=0.001, fc1=512, fc2=512, batch_size=512):
-        self.gamma = gamma
-        self.tau = tau
+    def __init__(self, hyper_parameters, input_dims=8, env_name=None, n_actions=2, max_size=10000, batch_size=512):
+        self.hyper_parameters = hyper_parameters
+        self.gamma = self.hyper_parameters['gamma']
+        self.tau = self.hyper_parameters['tau']
+
         self.memory = ReplayBuffer(max_size, input_dims, n_actions)
         self.batch_size = batch_size
         self.n_actions = n_actions
-        self.max_action = env.action_space.high[0]
-        self.min_action = env.action_space.low[0]
+        self.minions = [Minion(self, env_name, i) for i in range(self.hyper_parameters['number_of_minions'])]
 
-        self.actor = ActorNetwork(n_actions=n_actions, name='actor')
-        self.critic = CriticNetwork(n_actions=n_actions, name='critic')
-        self.target_actor = ActorNetwork(n_actions=n_actions, name='target_actor')
-        self.target_critic = CriticNetwork(n_actions=n_actions, name='target_critic')
+        self.actor = ActorNetwork(observation_dims=input_dims, output_dims=n_actions, name='actor')
+        self.critic = CriticNetwork(observation_dims=input_dims, output_dims=n_actions, name='critic')
+        self.target_actor = ActorNetwork(observation_dims=input_dims, output_dims=n_actions, name='target_actor')
+        self.target_critic = CriticNetwork(observation_dims=input_dims, output_dims=n_actions, name='target_critic')
 
-        self.actor.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=alpha))
-        self.critic.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=beta))
-        self.target_actor.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=alpha))
-        self.target_critic.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=beta))
+        self.actor.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=self.hyper_parameters['actor_learning_rate']))
+        self.critic.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=self.hyper_parameters['critic_learning_rate']))
+        self.target_actor.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=self.hyper_parameters['actor_learning_rate']))
+        self.target_critic.compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=self.hyper_parameters['critic_learning_rate']))
 
         self.update_network_parameters(tau=1)
+
+    def remember(self, state, action, reward, next_state, done):
+        self.memory.store_transition(state, action, reward, next_state, done)
 
     def update_network_parameters(self, tau=None):
         if tau is None:
@@ -45,9 +53,6 @@ class Agent:
             weights.append(weight * tau + targets[i] * (1 - tau))
         self.target_critic.set_weights(weights)
 
-    def remember(self, state, action, reward, next_state, done):
-        self.memory.store_transition(state, action, reward, next_state, done)
-
     def save_models(self):
         print('... saving models ...')
         self.actor.save_weights(self.actor.checkpoint_file)
@@ -62,18 +67,26 @@ class Agent:
         self.critic.load_weights(self.critic.checkpoint_file)
         self.target_critic.load_weights(self.target_critic.checkpoint_file)
 
-    def choose_action(self, observation, evaluate=False):
-        state = tf.convert_to_tensor([observation], dtype=tf.float32)
-        actions = self.actor(state)
-        if not evaluate:
-            actions += tf.random.normal(shape=[self.n_actions], mean=0.0, stddev=0.1)
-        actions = tf.clip_by_value(actions, self.min_action, self.max_action)
-
-        return actions[0]
+    def play(self):
+        # self.network.load_weights('weights.h5')
+        # print('model loaded')
+        processes = []
+        lock = threading.Lock()
+        # Start each minion to gather experience from the environment
+        for minion in self.minions:
+            process = threading.Thread(target=minion.play, args=(lock,))
+            processes.append(process)
+        for process in processes:
+            process.start()
+        for process in processes:
+            process.join()
+        # Collect the gathered experiences
 
     def learn(self):
         if self.memory.memory_counter < self.batch_size:
+            self.play()
             return
+        self.play()
         states, actions, rewards, next_states, dones = self.memory.sample_buffer(self.batch_size)
 
         states = tf.convert_to_tensor(states, dtype=tf.float32)
@@ -95,8 +108,16 @@ class Agent:
             new_policy_actions = self.actor(states)
             actor_loss = -self.critic(states, new_policy_actions)
             actor_loss = tf.math.reduce_mean(actor_loss)
-
+        print('loss ops')
         actor_network_gradient = tape.gradient(actor_loss, self.actor.trainable_variables)
         self.actor.optimizer.apply_gradients(zip(actor_network_gradient, self.actor.trainable_variables))
 
         self.update_network_parameters()
+
+
+hyper_parameters = {'tau': 0.001, 'gamma': 0.99, 'actor_learning_rate': 0.000025, 'critic_learning_rate': 0.00025,
+                    'number_of_minions': 10}
+
+agent = Agent(hyper_parameters, input_dims=8, env_name='LunarLanderContinuous-v2', n_actions=2)
+for i in range(1000000):
+    agent.learn()
