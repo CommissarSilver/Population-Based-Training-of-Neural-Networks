@@ -8,11 +8,12 @@ from minion import Minion
 
 
 class Agent:
-    def __init__(self, hyper_parameters, input_dims=8, env_name=None, n_actions=2, max_size=10000, batch_size=512):
+    def __init__(self, hyper_parameters, id, input_dims=8, env_name=None, n_actions=2, max_size=1000000, batch_size=64):
         self.hyper_parameters = hyper_parameters
         self.gamma = self.hyper_parameters['gamma']
         self.tau = self.hyper_parameters['tau']
 
+        self.id = id
         self.memory = ReplayBuffer(max_size, input_dims, n_actions)
         self.batch_size = batch_size
         self.n_actions = n_actions
@@ -33,6 +34,7 @@ class Agent:
             optimizer=tf.keras.optimizers.Adam(learning_rate=self.hyper_parameters['critic_learning_rate']))
 
         self.update_network_parameters(tau=1)
+        self.episode_rewards = []
 
     def remember(self, state, action, reward, next_state, done):
         self.memory.store_transition(state, action, reward, next_state, done)
@@ -67,9 +69,7 @@ class Agent:
         self.critic.load_weights(self.critic.checkpoint_file)
         self.target_critic.load_weights(self.target_critic.checkpoint_file)
 
-    def play(self):
-        # self.network.load_weights('weights.h5')
-        # print('model loaded')
+    def gather_experience(self):
         processes = []
         lock = threading.Lock()
         # Start each minion to gather experience from the environment
@@ -84,9 +84,10 @@ class Agent:
 
     def learn(self):
         if self.memory.memory_counter < self.batch_size:
-            self.play()
+            self.gather_experience()
             return
-        self.play()
+        self.gather_experience()
+
         states, actions, rewards, next_states, dones = self.memory.sample_buffer(self.batch_size)
 
         states = tf.convert_to_tensor(states, dtype=tf.float32)
@@ -108,16 +109,18 @@ class Agent:
             new_policy_actions = self.actor(states)
             actor_loss = -self.critic(states, new_policy_actions)
             actor_loss = tf.math.reduce_mean(actor_loss)
-        print('loss ops')
+
         actor_network_gradient = tape.gradient(actor_loss, self.actor.trainable_variables)
         self.actor.optimizer.apply_gradients(zip(actor_network_gradient, self.actor.trainable_variables))
 
         self.update_network_parameters()
 
 
-hyper_parameters = {'tau': 0.001, 'gamma': 0.99, 'actor_learning_rate': 0.000025, 'critic_learning_rate': 0.00025,
-                    'number_of_minions': 10}
+hyper_parameters = {'tau': 0.005, 'gamma': 0.99, 'actor_learning_rate': 0.001, 'critic_learning_rate': 0.002,
+                    'number_of_minions': 5}
 
-agent = Agent(hyper_parameters, input_dims=8, env_name='LunarLanderContinuous-v2', n_actions=2)
-for i in range(1000000):
-    agent.learn()
+# agent = Agent(hyper_parameters, input_dims=8, env_name='LunarLanderContinuous-v2', n_actions=2, id=1)
+# for i in range(10000000):
+#     agent.learn()
+#     agent.load_models()
+#     agent.save_models()

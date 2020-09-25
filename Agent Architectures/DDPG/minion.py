@@ -29,11 +29,11 @@ class Minion:
 
         return actions[0]
 
-    def play(self, lock):
-        with lock:
+    def play(self, threading_lock):
+        with threading_lock:
             step = 0
 
-            while (step < self.master.batch_size and self.episode_finished == False):
+            if not self.episode_finished:
                 action_to_take = self.choose_action(self.state)
                 next_state, reward, self.episode_finished, _ = self.environment.step(action_to_take)
                 # self.environment.render()
@@ -45,15 +45,20 @@ class Minion:
             if self.episode_finished:
                 self.state = self.environment.reset()
                 self.episode_rewards.append(self.cum_sum)
+                self.master.episode_rewards.append(self.cum_sum)
                 self.episode_num += 1
+                # print(self.episode_num, ' -> ', self.id, ' -> ', np.mean(self.episode_rewards))
 
                 if self.episode_num % 10 == 0:
-                    f = open('LunarLander - Single.csv', 'a')
-                    f.write('{},{},{}\n'.format(self.id, self.episode_num, np.mean(self.episode_rewards[-20:])))
+                    f = open('LunarLander - Multi.csv', 'a')
+                    f.write('{},{},{},{}\n'.format(self.master.id, self.id, self.episode_num,
+                                                   np.mean(self.episode_rewards[-10:])))
                     f.close()
 
-                if self.episode_num % 50 == 0:
-                    print(self.episode_num, ' -> ', self.id, ' -> ', np.mean(self.episode_rewards))
+                if self.episode_num % 5 == 0:
+                    print('Agent: ', self.master.id, ' -> ', 'Minion: ', self.id, ' -> ', 'Episode: ', self.episode_num,
+                          ' -> ',
+                          'Mean Rewards: ', ' -> ', np.mean(self.episode_rewards))
                     self.episode_rewards.clear()
 
                 self.cum_sum = 0
