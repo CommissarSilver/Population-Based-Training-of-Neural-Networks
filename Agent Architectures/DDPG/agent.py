@@ -17,7 +17,7 @@ class Agent:
         self.memory = ReplayBuffer(max_size, input_dims, n_actions)
         self.batch_size = batch_size
         self.n_actions = n_actions
-        self.minions = [Minion(self, env_name, i) for i in range(self.hyper_parameters['number_of_minions'])]
+        self.minions = [Minion(self, env_name, i) for i in range(1)]
 
         self.actor = ActorNetwork(observation_dims=input_dims, output_dims=n_actions, name='actor')
         self.critic = CriticNetwork(observation_dims=input_dims, output_dims=n_actions, name='critic')
@@ -41,7 +41,7 @@ class Agent:
 
     def update_network_parameters(self, tau=None):
         if tau is None:
-            tau = self.tau
+            tau = self.hyper_parameters['tau']
 
         weights = []
         targets = self.target_actor.weights
@@ -99,11 +99,11 @@ class Agent:
             target_actions = self.target_actor(next_states)
             next_critic_value = tf.squeeze(self.target_critic(next_states, target_actions), 1)
             critic_value = tf.squeeze(self.critic(states, actions), 1)
-            target = rewards + self.gamma * next_critic_value * (1 - dones)
+            target = rewards + self.hyper_parameters['gamma'] * next_critic_value * (1 - dones)
             critic_loss = tf.keras.losses.MSE(target, critic_value)
 
-        critic_network_gradient = tape.gradient(critic_loss, self.critic.trainable_variables)
-        self.critic.optimizer.apply_gradients(zip(critic_network_gradient, self.critic.trainable_variables))
+        critic_network_gradient = tape.gradient(critic_loss, self.critic.trainable_weights)
+        self.critic.optimizer.apply_gradients(zip(critic_network_gradient, self.critic.trainable_weights))
 
         with tf.GradientTape() as tape:
             new_policy_actions = self.actor(states)
@@ -116,9 +116,8 @@ class Agent:
         self.update_network_parameters()
 
 
-hyper_parameters = {'tau': 0.005, 'gamma': 0.99, 'actor_learning_rate': 0.001, 'critic_learning_rate': 0.002,
-                    'number_of_minions': 5}
-
+# hyper_parameters = {'tau': 0.005, 'gamma': 0.99, 'actor_learning_rate': 0.001, 'critic_learning_rate': 0.002}
+#
 # agent = Agent(hyper_parameters, input_dims=8, env_name='LunarLanderContinuous-v2', n_actions=2, id=1)
 # for i in range(10000000):
 #     agent.learn()
