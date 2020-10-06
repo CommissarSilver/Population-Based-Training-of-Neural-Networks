@@ -5,7 +5,7 @@ from minion import Minion
 import threading
 
 
-class Master:
+class Agent:
     def __init__(self, environment, initial_hyper_parameters):
         self.hyper_parameters = initial_hyper_parameters
         # these are the parameters we want to use with population based training
@@ -15,9 +15,9 @@ class Master:
         # Just using the minions to gather experience from different instances of environment
         self.minions = [Minion(self, environment, i) for i in range(initial_hyper_parameters['minions_num'])]
         # We're going to use one network for all of our minions
-        self.network = ActorCriticNetwork(observation_dims=8, output_dims=4)
-        self.optimizer = tf.keras.optimizers.Adam(lr=self.learning_rate)
-        # Since Actor-Critic is ana on-policy method, we will not use a replay buffer
+        self.network = ActorCriticNetwork(observation_dims=4, output_dims=2)
+        self.network.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=self.learning_rate))
+        # Since Actor-Critic is an on-policy method, we will not use a replay buffer
         self.states = []
         self.actions = []
         self.discounted_rewards = []
@@ -70,9 +70,7 @@ class Master:
                 # Optimize master's network with the mean of all the losses
                 entire_loss = tf.reduce_mean(self.losses)
                 grads = tape.gradient(entire_loss, self.network.trainable_variables)
-                self.optimizer.apply_gradients(zip(grads, self.network.trainable_variables))
+                self.network.optimizer.apply_gradients(zip(grads, self.network.trainable_variables))
 
 
-master = Master('LunarLander-v2',
-                {'learning_rate': 0.00007, 'discount_factor': 0.99, 'unroll_length': 50, 'minions_num': 5})
-master.learn()
+
