@@ -1,37 +1,20 @@
 import tensorflow as tf
-import A2C
+from agent import Agent
 import random
 
-gpu = tf.config.experimental.list_physical_devices('GPU')
-tf.config.experimental.set_memory_growth(gpu[0], True)
+# gpu = tf.config.experimental.list_physical_devices('GPU')
+# tf.config.experimental.set_memory_growth(gpu[0], True)
+# TRAIN_ITERS = 100
+
+hyper_parameters = {'tau': 0.005, 'gamma': 0.99, 'actor_learning_rate': 0.001, 'critic_learning_rate': 0.002,
+                    'number_of_minions': 1}
+
+population = {'agent': 'agent', 'agent_id': int, 'agent_mean_score': float}  # 16 workers
 
 
-def create_worker(TRAIN_ITERS, best_worker_id, hyper_params, i, queue):
-    print("Worker {} Starting".format(i))
-    worker = A2C.Master((84, 84, 4), [[1, 0, 0], [0, 1, 0], [0, 0, 1]], hyper_params)  # builds an agent with the given
-    # hyper_params
-    # worker.model.load_weights('Agent-{0} Model.h5'.format(best_worker_id))  # loads weights from the best agent so far
-    worker_id = i
-    print(" -> Worker {} Training".format(i))
-    returns = worker.train(TRAIN_ITERS, i)  # trains for the given number of iterations
-    print("         -> Worker {} returns".format(i), returns)
-    worker.model.save('Agent-{0} Model.h5'.format(worker_id))  # saves the agents  model
-    queue.put({'agent_id': worker_id,
-               'hyper_params': worker.hyper_params,
-               'returns': returns})
-
-
-def explore(hyper_params):
-    j = random.uniform(0.7, 1.5)  # perturbs the agents learning rate
-    hyper_params['learning_rate'] *= j
-    return hyper_params
-
-
-def exploit(training_results):
-    best_agent = sorted(training_results, key=lambda i: i['returns'], reverse=True)[0]  # sort the agents according
-    # their mean return
-    for agent in training_results:
-        agent['agent_id'] = best_agent['agent_id']
-        agent['hyper_params'] = explore(best_agent['hyper_params'])
-        agent['returns'] = []
-    return training_results
+def exploit(population):
+    sorted_population = sorted(population, key=lambda i: i['agent_mean_score'], reverse=True)
+    best_agents = sorted_population[:3]
+    worst_agents = sorted_population[:-3]
+    agent_to_exploit
+    print('hi')

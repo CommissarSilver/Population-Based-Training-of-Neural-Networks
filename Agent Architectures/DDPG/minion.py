@@ -50,12 +50,12 @@ class Minion:
                 # print(self.episode_num, ' -> ', self.id, ' -> ', np.mean(self.episode_rewards))
 
                 if self.episode_num % 10 == 0:
-                    f = open('LunarLander - Multi.csv', 'a')
+                    f = open('LunarLander - PBT -Multi.csv', 'a')
                     f.write('{},{},{},{}\n'.format(self.master.id, self.id, self.episode_num,
                                                    np.mean(self.episode_rewards[-10:])))
                     f.close()
 
-                if self.episode_num % 5 == 0:
+                if self.episode_num % 50 == 0:
                     print('Agent: ', self.master.id, ' -> ', 'Minion: ', self.id, ' -> ', 'Episode: ', self.episode_num,
                           ' -> ',
                           'Mean Rewards: ', ' -> ', np.mean(self.episode_rewards))

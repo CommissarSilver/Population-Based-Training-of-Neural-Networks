@@ -3,14 +3,14 @@ import os
 
 
 class ActorCriticNetwork(tf.keras.Model):
-    def __init__(self, observation_dims, output_dims, name='ActorCritic', checkpoint_directory='tmp/AC'):
+    def __init__(self, observation_dims, output_dims, name='PolicyGradient', checkpoint_directory='tmp/PG'):
         super(ActorCriticNetwork, self).__init__()
         self.input_dims = observation_dims
         self.output_dims = output_dims
         # Create a checkpoint directory in case we want to save our model
         self.model_name = name
-        self.checkpoint_dir = checkpoint_directory
-        self.checkpoint_file = os.path.join(self.checkpoint_dir, self.model_name + 'AC.h5')
+        self.checkPoint_dir = checkpoint_directory
+        self.checkpoint_file = os.path.join(self.checkPoint_dir, self.model_name + 'PG.h5')
 
         self.dense_layer_1 = tf.keras.layers.Dense(units=1024, activation='relu', name='Dense_Layer_1',
                                                    dtype=tf.float32)
@@ -18,15 +18,12 @@ class ActorCriticNetwork(tf.keras.Model):
         self.dense_layer_3 = tf.keras.layers.Dense(units=16, activation='relu', name='Dense_Layer_3', dtype=tf.float32)
         self.action_logits = tf.keras.layers.Dense(units=self.output_dims, activation=None, name='Action_Logits',
                                                    dtype=tf.float32)
-        self.state_value = tf.keras.layers.Dense(units=1, activation=None, name='State_Value', dtype=tf.float32)
 
     def call(self, state):
-
         x = self.dense_layer_1(state)
         x = self.dense_layer_2(x)
-        y = self.dense_layer_3(x) # use dense layer 3 as an extra layer for critic
+        x = self.dense_layer_3(x)
 
         action_logits = self.action_logits(x)
-        state_value = self.state_value(y)
 
-        return state_value, action_logits
+        return action_logits

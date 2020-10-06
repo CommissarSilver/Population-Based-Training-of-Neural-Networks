@@ -15,16 +15,19 @@ class ActorCriticNetwork(tf.keras.Model):
         self.dense_layer_1 = tf.keras.layers.Dense(units=1024, activation='relu', name='Dense_Layer_1',
                                                    dtype=tf.float32)
         self.dense_layer_2 = tf.keras.layers.Dense(units=512, activation='relu', name='Dense_Layer_2', dtype=tf.float32)
-        self.dense_layer_3 = tf.keras.layers.Dense(units=16, activation='relu', name='Dense_Layer_3', dtype=tf.float32)
+        self.dense_layer_3 = tf.keras.layers.Dense(units=256, activation='relu', name='Dense_Layer_2', dtype=tf.float32)
+        self.dense_layer_4 = tf.keras.layers.Dense(units=256, activation='relu', name='Dense_Layer_2', dtype=tf.float32)
+        self.dense_layer_5 = tf.keras.layers.Dense(units=16, activation='relu', name='Dense_Layer_3', dtype=tf.float32)
         self.action_logits = tf.keras.layers.Dense(units=self.output_dims, activation=None, name='Action_Logits',
                                                    dtype=tf.float32)
         self.state_value = tf.keras.layers.Dense(units=1, activation=None, name='State_Value', dtype=tf.float32)
 
     def call(self, state):
-
         x = self.dense_layer_1(state)
         x = self.dense_layer_2(x)
-        y = self.dense_layer_3(x) # use dense layer 3 as an extra layer for critic
+        x = self.dense_layer_3(x)  # use dense layer 3 as an extra layer for critic
+        x = self.dense_layer_4(x)
+        y = self.dense_layer_5(x)
 
         action_logits = self.action_logits(x)
         state_value = self.state_value(y)

@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-import NeuralModel
+import network
 from collections import deque
 import play_episode
 

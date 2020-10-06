@@ -54,7 +54,7 @@ class Minion:
             self.rewards.clear()
             step = 0
 
-            while (step < self.master.unroll_length and self.episode_finished == False):
+            while step < self.master.unroll_length and self.episode_finished == False:
                 action_to_take = self.choose_action(self.state)
                 next_state, reward, self.episode_finished, _ = self.environment.step(action_to_take)
                 # self.environment.render()
