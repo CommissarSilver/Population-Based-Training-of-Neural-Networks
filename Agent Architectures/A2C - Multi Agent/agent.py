@@ -1,8 +1,6 @@
 import tensorflow as tf
 import tensorflow_probability as tfp
 from network import ActorCriticNetwork
-from minion import Minion
-import threading
 import numpy as np
 
 
@@ -19,7 +17,7 @@ class Agent:
         # We're going to use one network for all of our minions
         self.network = ActorCriticNetwork(observation_dims=observation_dims, output_dims=output_dims,
                                           name='Coordinator {} - Agent {}'.format(coordinator_id, agent_id))
-        self.network.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=self.learning_rate))
+        self.network.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=self.hyper_parameters['learning_rate']))
         # Since Actor-Critic is an on-policy method, we will not use a replay buffer
         self.states = []
         self.actions = []
@@ -27,10 +25,8 @@ class Agent:
         self.discounted_rewards = []
         self.losses = []
 
-    def discount_rewards(self, rewards):
+    def discount_rewards(self, rewards, normalize=False):
         discounted_rewards = np.zeros_like(rewards)
-        if len(rewards) == 0:
-            print('we have a problem')
 
         for t in range(len(rewards)):
             discounted_sum = 0
@@ -38,12 +34,13 @@ class Agent:
 
             for k in range(t, len(rewards)):
                 discounted_sum += rewards[k] * discount
-                discount *= self.discount_factor
+                discount *= self.hyper_parameters['discount_factor']
             discounted_rewards[t] = discounted_sum
         # Normalize discounter rewards
-        mean = np.mean(discounted_rewards)
-        std = np.std(discounted_rewards) if np.std(discounted_rewards) > 0 else 1
-        discounted_rewards = (discounted_rewards - mean) / std
+        if normalize:
+            mean = np.mean(discounted_rewards)
+            std = np.std(discounted_rewards) if np.std(discounted_rewards) > 0 else 1
+            discounted_rewards = (discounted_rewards - mean) / std
 
         return discounted_rewards
 
@@ -65,7 +62,6 @@ class Agent:
         self.network.load_weights(self.network.checkpoint_file)
 
     def learn(self):
-        # x = self.rewards.pop()
         discounted_rewards = self.discount_rewards(self.rewards)
 
         with tf.GradientTape() as tape:
@@ -78,9 +74,10 @@ class Agent:
                 action_distributions = tfp.distributions.Categorical(probs=action_probabilities, dtype=tf.float32)
                 log_probs = action_distributions.log_prob(self.actions[exp_num])
                 entropy = -1 * tf.math.reduce_sum(action_probabilities * tf.math.log(action_probabilities))
-                actor_loss = tf.math.reduce_sum(-1 * discounted_rewards[exp_num] * log_probs) - 0.0001 * entropy
+                actor_loss = tf.math.reduce_sum(-1 * discounted_rewards[exp_num] * log_probs) - self.hyper_parameters[
+                    'entropy_coefficient'] * entropy
                 critic_loss = tf.math.reduce_sum(advantage ** 2)
-                total_loss = actor_loss + 0.4 * critic_loss
+                total_loss = actor_loss + self.hyper_parameters['critic_coefficient'] * critic_loss
 
                 self.losses.append(total_loss)
             # Optimize master's network with the mean of all the losses
