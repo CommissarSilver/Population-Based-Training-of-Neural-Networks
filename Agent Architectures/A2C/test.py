@@ -14,12 +14,9 @@ if __name__ == '__main__':
     for process in processs:
         print('starting process')
         process.start()
-# A2C.main('test')
-# import A2C
-# agent1 = A2C.MasterAgent((84, 84, 4), [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-#                      {'learning_rate': 0.9, 'discount_factor': 0.95, 'minions_num': 10})
-# for i in range(50):
-#     print('iteration: ', i)
-#     A2C.main(agent1,'train')
-#
-# # print('hi')
+
+agent1 = A2C.MasterAgent((84, 84, 4), [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+                     {'learning_rate': 0.9, 'discount_factor': 0.95, 'minions_num': 10})
+for i in range(50):
+    print('iteration: ', i)
+    A2C.main('train')
