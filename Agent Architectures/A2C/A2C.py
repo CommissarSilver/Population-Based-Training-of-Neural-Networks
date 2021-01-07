@@ -18,7 +18,7 @@ class MasterAgent:
         self.minions = [Minion(self) for i in range(5)]
 
     def gather_experience(self):
-        print('     playing')
+        print('--> Playing')
         for minion in self.minions:
             minion.model.set_weights(self.model.get_weights())  # copy master agent's network weights to all the minion
             # agents
@@ -28,17 +28,17 @@ class MasterAgent:
         for minion in self.minions:
             thread = threading.Thread(target=minion.play)
             minion_threads.append(thread)
-            thread.start()  # start salve agents
+            thread.start()  # start minion agents
 
         for minion_thread in minion_threads:
-            minion_thread.join()  # wait until all salve agents are done
+            minion_thread.join()  # wait until all minion agents are done
 
         for minion in self.minions:
             self.experiences.append(minion.episode_info)  # store minion agent's experience for training
 
     def train(self):
         self.gather_experience()
-        print('     training')
+        print('--> Training')
         for episode in self.experiences:
             returns = np.zeros((len(episode['rewards']), 1))
             ret = 0
@@ -105,21 +105,14 @@ class Minion:
             self.step(state.reshape(1, 84, 84, 4))
 
 
-def main( train_or_test):
+def main(train_or_test):
     master_agent = MasterAgent((84, 84, 4), [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-                             {'learning_rate': 0.9, 'discount_factor': 0.95, 'minions_num': 10})
+                               {'learning_rate': 0.9, 'discount_factor': 0.95, 'minions_num': 10})
     master_agent.model.load_weights('Master-10.h5')
-    print('     loading model')
+    print('--> Loading model')
 
     for i in range(10):
         master_agent.train()
     # #
     master_agent.model.save('Master-10.h5')
-    print('     model saved')
-
-
-# # # else:
-# # #     agent1.test()
-
-
-# main( 'train')
+    print('--> Model saved')
